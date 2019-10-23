@@ -1,0 +1,19 @@
+---
+- hosts: projectname.www
+  gather_facts: false
+  tasks:
+    - name: Create website files directory
+      file:
+        path: /www/https_www.projectname.com
+        state: directory
+        owner: wwwfiles
+        group: wwwfiles
+        mode: '0755'
+
+    - name: Pull/update website files
+      become: true
+      become_user: wwwfiles
+      git:
+        repo: https://github.com/projectname/projectname-www
+        version: master
+        dest: /www/https_www.projectname.com

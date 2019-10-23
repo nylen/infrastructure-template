@@ -1,0 +1,141 @@
+---
+- hosts: projectname_devuan
+  gather_facts: false
+  tasks:
+    - name: Wait for new servers to become ready
+      wait_for_connection:
+        timeout: 360
+
+    - name: Wait for cloudinit script on new servers
+      wait_for:
+        path: /projectname/server-setup/99-done
+
+    - name: Update and upgrade apt packages
+      apt:
+        update_cache: true
+        upgrade: true
+
+    - name: Autoremove unneeded packages
+      apt:
+        autoremove: true
+
+    - name: Harden SSH config - disable PasswordAuthentication
+      lineinfile:
+        path: "/etc/ssh/sshd_config"
+        regexp: "^#?PasswordAuthentication .*$"
+        line: 'PasswordAuthentication no'
+      register: result_ssh_passwordauthentication_no
+
+    - name: Harden SSH config - disable UsePAM
+      lineinfile:
+        path: "/etc/ssh/sshd_config"
+        regexp: "^#?UsePAM .*$"
+        line: 'UsePAM no'
+      register: result_ssh_usepam_no
+
+    - name: Harden SSH config - modify PermitRootLogin
+      lineinfile:
+        path: "/etc/ssh/sshd_config"
+        regexp: "^#?PermitRootLogin .*$"
+        line: 'PermitRootLogin prohibit-password'
+      register: result_ssh_permitrootlogin_prohibitpassword
+
+    - name: Restart SSH if any changes were made
+      command: "/etc/init.d/ssh restart"
+      when: |
+        result_ssh_passwordauthentication_no['changed'] or
+        result_ssh_usepam_no['changed'] or
+        result_ssh_permitrootlogin_prohibitpassword['changed']
+
+    - name: Install required packages
+      apt:
+        name: "{{ packages }}"
+        state: present
+      vars:
+        packages:
+          - build-essential
+          - curl
+          - fail2ban
+          - git
+          - htop
+          - joe
+          - netcat
+          - sysv-rc-conf
+          - tmux
+          - ufw
+          - vim-nox
+
+    - name: Download dotfiles (root)
+      git:
+        repo: https://github.com/nylen/dotfiles.git
+        dest: /root/dotfiles
+      register: result_dotfiles_root
+
+    - name: Install dotfiles (root)
+      command: /root/dotfiles/_install.sh
+      when: result_dotfiles_root['changed']
+
+    - name: Ensure dotfiles are loaded (root)
+      lineinfile:
+        path: "/root/.bashrc"
+        line: ". /root/.bash_aliases"
+        state: present
+
+    - name: Configure shell prompt hostname (root)
+      lineinfile:
+        path: "/root/.bashrc_local"
+        create: true
+        line: "__ps1_hostname={{ inventory_hostname }}"
+        state: present
+      loop: "{{ projectname_users }}"
+
+    - name: Add non-root users
+      user:
+        name: "{{ item }}"
+        shell: /bin/bash
+        password: '*' # no valid password, but SSH login enabled
+      loop: "{{ projectname_users }}"
+
+    - name: Add SSH keys for non-root users
+      authorized_key:
+        user: "{{ item.0 }}"
+        key: "{{ item.1 }}"
+        state: present
+      loop: "{{ projectname_users|product([projectname_ssh_keys])|list }}"
+
+    - name: Download dotfiles (non-root)
+      become: true
+      become_user: "{{ item }}"
+      git:
+        repo: https://github.com/nylen/dotfiles.git
+        dest: "/home/{{ item }}/dotfiles"
+      loop: "{{ projectname_users }}"
+      register: result_dotfiles_nonroot
+
+    - name: Install dotfiles (non-root)
+      become: true
+      become_user: "{{ item }}"
+      command: "/home/{{ item }}/dotfiles/_install.sh"
+      loop: "{{ projectname_users }}"
+      # TODO: this is all-or-nothing for all users (should be fine though)
+      when: result_dotfiles_nonroot['changed']
+
+    - name: Configure shell prompt hostname (non-root)
+      become: true
+      become_user: "{{ item }}"
+      lineinfile:
+        path: "/home/{{ item }}/.bashrc_local"
+        create: true
+        line: "__ps1_hostname={{ inventory_hostname }}"
+        state: present
+      loop: "{{ projectname_users }}"
+
+    - name: Configure shell history (non-root)
+      # Allows the history settings in the dotfiles to take full effect.
+      become: true
+      become_user: "{{ item }}"
+      replace:
+        path: "/home/{{ item }}/.bashrc"
+        regexp: "^(HIST.*)$"
+        replace: '#\1'
+      loop: "{{ projectname_users }}"

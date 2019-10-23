@@ -1,0 +1,31 @@
+---
+- hosts: projectname_devuan_Role_mysql8-client
+  gather_facts: false
+  tasks:
+    # Do not upgrade existing servers from 'mariadb-client' to 'mysql8-client',
+    # this is not tested and may not work!
+    # https://dev.mysql.com/doc/mysql-apt-repo-quick-guide/en/#repo-qg-apt-repo-manual-setup
+    - name: Add apt key for MySQL 8.0
+      apt_key:
+        id: A4A9406876FCBD3C456770C88C718D3B5072E1F5
+        # Other keyservers including the fancy "high availability pool"
+        # ha.pool.sks-keyservers.net are failing a lot!  This one seems ok...
+        keyserver: keyserver.ubuntu.com
+        state: present
+
+    # From https://docs.ansible.com/ansible/latest/modules/apt_key_module.html:
+    # > Adding a new key requires an apt cache update (e.g. using the apt
+    # > module’s update_cache option)
+    # This satisfies this requirement because 'update_cache' is true by default.
+    - name: Add apt repository for MySQL 8.0
+      apt_repository:
+        repo: "deb http://repo.mysql.com/apt/debian/ stretch mysql-8.0"
+        state: present
+
+    - name: Install MySQL 8.0 client
+      apt:
+        name: "{{ packages }}"
+        state: latest
+      vars:
+        packages:
+          - mysql-client

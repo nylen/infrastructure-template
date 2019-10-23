@@ -1,0 +1,26 @@
+# Forked from:
+# https://github.com/github/gitignore/blob/f908e51b/Terraform.gitignore
+
+# Local configuration
+/cloudflare.tf
+/digitalocean.tf
+
+# Local .terraform directories
+**/.terraform/*
+
+# .tfstate files
+*.tfstate
+*.tfstate.*
+
+# Python virtualenv (for ansible)
+/bin/
+/include/
+/lib/
+/local/
+/pip-selfcheck.json
+
+# Backups
+/backups/
+
+# Other
+*.pyc

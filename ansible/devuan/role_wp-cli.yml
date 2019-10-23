@@ -1,0 +1,12 @@
+---
+- hosts: projectname_devuan_Role_wp-cli
+  gather_facts: false
+  tasks:
+    - name: Install/upgrade WP-CLI
+      get_url:
+        # https://github.com/wp-cli/wp-cli/releases
+        url: https://github.com/wp-cli/wp-cli/releases/download/v2.2.0/wp-cli-2.2.0.phar
+        checksum: "sha256:71ee8a2449f17bf8a6fd385872cbdc3cc263107f7767a3b55f6c6e2ef5920368"
+        dest: /usr/local/bin/wp
+        owner: root
+        mode: '0755'

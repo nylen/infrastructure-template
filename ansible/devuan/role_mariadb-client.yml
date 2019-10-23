@@ -1,0 +1,8 @@
+---
+- hosts: projectname_devuan_Role_mariadb-client
+  gather_facts: false
+  tasks:
+    - name: Install MariaDB client package
+      apt:
+        name: mariadb-client
+        state: present

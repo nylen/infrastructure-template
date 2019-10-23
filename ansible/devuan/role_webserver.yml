@@ -1,0 +1,162 @@
+---
+- hosts: projectname_devuan_Role_webserver
+  gather_facts: false
+  tasks:
+    # NOTE: All PHP webservers MUST define one of the "webserver-php*" roles!
+    - name: Install webserver packages
+      apt:
+        name: "{{ packages }}"
+        state: present
+      vars:
+        packages:
+          - apache2
+          - python-openssl # for Let's Encrypt via acme-tiny
+
+    - name: Open webserver ports
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - 80
+        - 443
+
+    - name: Increase webserver log retention
+      replace:
+        path: /etc/logrotate.d/apache2
+        regexp: '^\trotate .*$'
+        replace: '\trotate 9999'
+
+    - name: Create basic directory structure
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        # Note: creates three levels at once; all dirs are used elsewhere.
+        - /www/ssl/acme-challenge/
+        - /www/src/
+
+    - name: Enable required Apache modules
+      # Note: This must happen before copying the configs into place, otherwise
+      # `apache2ctl` will check the config and fail!
+      command: "a2enmod {{ item }}"
+      args:
+        creates: "/etc/apache2/mods-enabled/{{ item }}.load"
+      loop:
+        - expires
+        - headers
+        - rewrite
+        - ssl
+      register: result_enable_modules
+
+    - name: Restart Apache if any modules added
+      command: "/etc/init.d/apache2 restart"
+      when: result_enable_modules['changed']
+
+    # Apache configuration order needs to go like this:
+    # - Enable HTTP virtual hosts
+    # - Get SSL certificate (using HTTP)
+    # - Enable HTTPS virtual hosts (otherwise the SSL cert doesn't exist)
+
+    - name: Copy Apache host config (HTTP for redirects and SSL challenges)
+      copy:
+        src: resources/http_virtualhost.conf
+        dest: "/etc/apache2/sites-available/http.conf"
+      register: result_copy_http
+
+    - name: Disable default Apache virtual host
+      command: "a2dissite 000-default"
+      args:
+        removes: /etc/apache2/sites-enabled/000-default.conf
+      register: result_disable_default
+
+    - name: Enable Apache virtual host (HTTP)
+      command: "a2ensite http"
+      args:
+        creates: /etc/apache2/sites-enabled/http.conf
+      register: result_enable_http
+
+    - name: Reload Apache config if anything changed (HTTP)
+      command: "/etc/init.d/apache2 reload"
+      when: |
+        result_copy_http['changed'] or
+        result_disable_default['changed'] or
+        result_enable_http['changed']
+
+    - name: Create certificates directory
+      # Note: /www/ssl/ created during "Create basic directory structure" above
+      file:
+        path: /www/ssl/certs/
+        state: directory
+        owner: root
+        group: www-data
+        mode: '0710'
+
+    - name: Install Let's Encrypt client
+      git:
+        repo: https://github.com/diafygi/acme-tiny
+        dest: /www/ssl/acme-tiny
+        version: 5350420d35177eda733d85096433a24e55f8d00e
+
+    - name: Install Let's Encrypt wrapper script (1)
+      copy:
+        src: resources/ssl-renew.sh
+        dest: /www/ssl/certs/renew.sh
+        mode: '0700'
+
+    - name: Install Let's Encrypt wrapper script (2)
+      copy:
+        src: resources/ssl-renew-cron.sh
+        dest: /www/ssl/certs/renew-cron.sh
+        mode: '0700'
+
+    - name: Generate private keys for SSL
+      openssl_privatekey:
+        path: "/www/ssl/certs/{{ item }}"
+      loop:
+        - user.key
+        - server.key
+
+    - name: Create/update hostnames file
+      copy:
+        content: "{{ projectname_hostnames_full|join('\n') }}\n"
+        dest: /www/ssl/hostnames
+        owner: root
+        mode: '0600'
+      register: results_ssl_hostnames
+
+    - name: (Re)generate SSL certificate
+      # Note: When it runs, this will reload the Apache config by itself.
+      command: /www/ssl/certs/renew.sh
+      when: results_ssl_hostnames['changed']
+
+    - name: Add cron job to renew SSL certificate
+      cron:
+        name: "Renew SSL certificates"
+        minute: "3"
+        hour: "3"
+        day: "3"
+        job: "/www/ssl/certs/renew-cron.sh"
+
+    # TODO: Remove and disable configs when hostnames are removed.
+    - name: Copy Apache host configs (HTTPS)
+      template:
+        src: resources/https_virtualhost.conf
+        dest: "/etc/apache2/sites-available/https_{{ item }}.projectname.com.conf"
+      loop: "{{ projectname_hostnames }}"
+      register: results_copy_https
+
+    - name: Enable Apache virtual hosts (HTTPS)
+      command: "a2ensite https_{{ item }}.projectname.com"
+      args:
+        creates: "/etc/apache2/sites-enabled/https_{{ item }}.projectname.com.conf"
+      loop: "{{ projectname_hostnames }}"
+      register: results_enable_https
+
+    - name: Reload Apache config if anything changed (HTTPS)
+      command: "/etc/init.d/apache2 reload"
+      when: |
+        results_ssl_hostnames['changed'] or
+        results_copy_https['changed'] or
+        results_enable_https['changed']

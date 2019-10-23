@@ -1,0 +1,15 @@
+---
+  # Tasks common to all Devuan servers
+- import_playbook: devuan.yml
+
+  # Server roles (specific programs/tasks)
+- import_playbook: devuan/role_composer.yml
+- import_playbook: devuan/role_mariadb-client.yml
+- import_playbook: devuan/role_mysql8-client.yml
+  # NOTE role_webserver-php* MUST come before role-webserver!
+- import_playbook: devuan/role_webserver-php72.yml
+- import_playbook: devuan/role_webserver.yml
+- import_playbook: devuan/role_wp-cli.yml
+
+  # Specific servers
+- import_playbook: devuan/projectname.www.yml
