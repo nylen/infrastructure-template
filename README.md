@@ -3,6 +3,10 @@
 This repository controls the names and configurations of the ProjectName
 servers hosted on DigitalOcean.
 
+(This repository is a _template_ for your own project. You can download/clone
+the files and use it as-is, or you can run the `scripts/_convert.sh` script to
+rename all the files from "project name" to a name you specify.)
+
 ## How it works
 
 ### 1. Create servers
