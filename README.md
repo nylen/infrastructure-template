@@ -1,7 +1,13 @@
 # ProjectName Infrastructure
 
-This repository controls the names and configurations of the ProjectName
+## What is this?
+
+This repository controls the names and configurations of the "ProjectName"
 servers hosted on DigitalOcean.
+
+(This repository is a _template_ for your own project. You can download/clone
+the files and use it as-is, or you can run the `scripts/_convert.sh` script to
+rename all the files from "project name" to a name you specify.)
 
 Servers are currently based on the Debian 9 image, and they are converted to
 [Devuan](https://devuan.org/)
@@ -17,11 +23,84 @@ There are also a number of supporting scripts included for tasks such as
 listing all available servers and updating your SSH config file to point to
 them correctly.  These scripts are documented below.
 
-(This repository is a _template_ for your own project. You can download/clone
-the files and use it as-is, or you can run the `scripts/_convert.sh` script to
-rename all the files from "project name" to a name you specify.)
+## Why this approach?
+
+Generally, like any kind of
+[DevOps](https://en.wikipedia.org/wiki/DevOps)
+tooling, this approach to managing servers aims to **avoid manual processes**.
+As software projects and their infrastructure grow, more servers are needed.
+Setting them up manually takes a while and increases the chance of problems,
+which could be basic configuration errors or "drift" in which different
+servers' configurations diverge over time. This "drift" has a tendency to cause
+unexpected problems later on.
+
+**Automating everything** related to server configuration also makes it
+possible to solve a number of related problems more easily, such as **regularly
+rebuilding your servers** and **automatic scaling**.  This template does not
+solve these problems, rather it aims to serve as a workable base for
+implementing your own rebuild/scaling strategies later on.
+
+More specifically, this tempate uses
+[Terraform](https://www.terraform.io/)
+and
+[Ansible](https://www.ansible.com/)
+to manage different steps of the server configuration process.
+
+The _input_ for each of these tools is a set of code (text files) that
+describes the desired server configuration, and the scripts and documentation
+in this repository are designed to help you _execute_ this code, with the end
+result of creating and updating your servers according to your configuration.
+
+Terraform is
+[designed to create and destroy servers](https://www.terraform.io/intro/vs/chef-puppet.html)
+while configuration management tools like Ansible are designed to manage server
+configuration.
+
+Terraform was chosen because of its approach of inspecting _existing_ resources
+and _desired_ resources, and then planning and executing the changes to turn
+the _existing_ state into the _desired_ state.  It always shows you exactly
+what it's going to do before it does it, which is a big benefit when performing
+potentially destructive actions.
+
+Ansible was chosen because of its
+[design goals](https://en.wikipedia.org/wiki/Ansible_%28software%29#Design_goals)
+and because it is easy to install into a project without affecting the rest of
+the computer.
+
+To bridge these two tools (i.e. feed a list of Terraform-created servers into
+Ansible so that it can manage their configuration), an approach similar to
+[this article](https://nicholasbering.ca/tools/2018/01/08/introducing-terraform-provider-ansible/)
+is used, implemented as a local script stored in this repository
+(`terraform-inventory.py`).
+
+## Prerequisites
+
+- Solid understanding of how to use the Linux command line, including SSH with
+  private/public key authentication.
+- Bonus: familiarity with using `git` to manage sets of code/text files.
+- `terraform` v0.11 installed and available in your `$PATH`.  See the
+  "Compatibility" section below for more details.
+- Python 2.7 or higher, or 3.5 or higher, including `pip` and `virtualenv`.
 
 ## How it works
+
+### 0. Modify the project template for your project name
+
+Run `scripts/_convert.sh` to change the template files from "Project Name" to your project. Your project name should be a single word in CamelCase.  For example:
+
+```sh
+scripts/_convert.sh MyAwesomeProduct
+```
+
+Then you will probably want to `git add` and `git commit` the resulting changes.
+
+As you make further changes, you should update this Readme so that it serves as
+the documentation for your project's servers, and continue using `git add` and
+`git commit` to track the history of the project.
+
+Avoid storing _passwords_, _API keys_ and other _secrets_ in this repository!
+These should be managed separately in a way that allows for _rotation_ and
+_deletion_ as needed (currently outside the scope of this template).
 
 ### 1. Create servers
 
@@ -38,9 +117,10 @@ The following steps need to be done once per computer:
 
 - Add some **public SSH keys** (including your own) to a file named
   `keys/ssh_authorized_keys_ROOT.txt` under this directory.  There should be
-  one key for each member of the infrastructure team; ask someone if you don't
-  have them or you aren't sure what this file should look like.  These are the
-  keys that will be added to any new servers you create.
+  one key per line, and one key for each member of your infrastructure team;
+  ask someone if you don't have their key or you aren't sure what this file
+  should look like.  These are the keys that will be added to any new servers
+  you create.
 
 - Grab a Cloudflare API key from
   [your profile page](https://dash.cloudflare.com/profile)
@@ -53,6 +133,11 @@ provider "cloudflare" {
     version = "~> 1.12"
 }
 ```
+
+(If you don't want to use Cloudflare for DNS, then you should remove or comment
+out all the sections in `modules/digitalocean-devuan/main.tf` that have to do
+with `cloudflare_record` resources.  It will then be your responsibility to set
+the DNS records for your server(s) correctly.)
 
 - Grab a DigitalOcean API key from
   [the Applications & API page](https://cloud.digitalocean.com/account/api/tokens)
@@ -195,32 +280,3 @@ Note, even though this script is a single command, it is not fully automatic
 from start to finish.  Terraform will prompt you to apply any changes, and
 Ansible will prompt you to accept SSH host keys for new servers.
 
-## Why?
-
-The alternative is a manual process to create and set up servers.  This takes a
-while, and it basically guarantees that our servers will not be "equal" and
-that we will miss things when we update them.
-
-### Why this approach?
-
-Terraform is
-[designed to create and destroy servers](https://www.terraform.io/intro/vs/chef-puppet.html)
-while configuration management tools like Ansible are designed to manage server
-configuration.
-
-Terraform was chosen because of its approach of inspecting _existing_ resources
-and _desired_ resources, and then planning and executing the changes to turn
-the _existing_ state into the _desired_ state.  It always shows you exactly
-what it's going to do before it does it, which is a big benefit when performing
-potentially destructive actions.
-
-Ansible was chosen because of its
-[design goals](https://en.wikipedia.org/wiki/Ansible_%28software%29#Design_goals)
-and because it is easy to install into a project without affecting the rest of
-the computer.
-
-To bridge these two tools (i.e. feed a list of Terraform-created servers into
-Ansible so that it can manage their configuration), an approach similar to
-[this article](https://nicholasbering.ca/tools/2018/01/08/introducing-terraform-provider-ansible/)
-is used, implemented as a local script stored in this repository
-(`terraform-inventory.py`).
