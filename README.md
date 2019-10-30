@@ -137,7 +137,8 @@ provider "cloudflare" {
 (If you don't want to use Cloudflare for DNS, then you should remove or comment
 out all the sections in `modules/digitalocean-devuan/main.tf` that have to do
 with `cloudflare_record` resources.  It will then be your responsibility to set
-the DNS records for your server(s) correctly.)
+the DNS records for your server(s) correctly.  You probably want to do this
+**after** running `terraform` and **before** running `ansible`.)
 
 - Grab a DigitalOcean API key from
   [the Applications & API page](https://cloud.digitalocean.com/account/api/tokens)
