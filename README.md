@@ -9,7 +9,7 @@ servers hosted on DigitalOcean.
 the files and use it as-is, or you can run the `scripts/_convert.sh` script to
 rename all the files from "project name" to a name you specify.)
 
-Servers are currently based on the Debian 9 image, and they are converted to
+Servers are currently based on the Debian 10 image, and they are converted to
 [Devuan](https://devuan.org/)
 (a fork of Debian without systemd) on first boot.  The conversion is done using
 a cloudinit script that is associated with the server when it is created by

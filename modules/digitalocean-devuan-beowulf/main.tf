@@ -3,17 +3,17 @@
 
 // https://www.terraform.io/docs/providers/template/d/cloudinit_config.html
 data "template_file" "projectname_devuan_cloudinit" {
-	template = "${file("${path.module}/../../remote/projectname-digitalocean-devuan-cloudinit.tpl")}"
+	template = "${file("${path.module}/cloudinit.tpl")}"
 	vars = {
-		init_sh           = "${base64encode(file("${path.module}/../../remote/projectname-digitalocean-devuan-init.sh"))}"
+		init_sh           = "${base64encode(file("${path.module}/init.sh"))}"
 		ssh_keys_ROOT_txt = "${base64encode(file("${path.module}/../../keys/ssh_authorized_keys_ROOT.txt"))}"
 	}
 }
 
 resource "digitalocean_droplet" "this" {
-	image  = "debian-9-x64"
+	image  = "debian-10-x64"
 	name   = "${var.name}"
-	region = "ams3"
+	region = "nyc3"
 	size   = "${var.size}"
 
 	tags = [
@@ -28,32 +28,32 @@ resource "digitalocean_droplet" "this" {
 	lifecycle {
 		ignore_changes = ["user_data"]
 		// TODO: doesn't always work? e.g. if a module is renamed or removed
-		prevent_destroy = true
+		// prevent_destroy = true
 	}
 }
 
 // Waiting for for_each:
 // https://github.com/hashicorp/terraform/issues/17179
 
-resource "cloudflare_record" "projectname_dns_unproxied" {
-	count   = "${length(var.projectname_hostnames_unproxied)}"
-
-	domain  = "projectname.com"
-	name    = "${element(var.projectname_hostnames_unproxied, count.index)}"
-	type    = "A"
-	value   = "${digitalocean_droplet.this.ipv4_address}"
-	proxied = false
-}
-
-resource "cloudflare_record" "projectname_dns_proxied" {
-	count   = "${length(var.projectname_hostnames_proxied)}"
-
-	domain  = "projectname.com"
-	name    = "${element(var.projectname_hostnames_proxied, count.index)}"
-	type    = "A"
-	value   = "${digitalocean_droplet.this.ipv4_address}"
-	proxied = true
-}
+//resource "cloudflare_record" "projectname_dns_unproxied" {
+//	count   = "${length(var.projectname_hostnames_unproxied)}"
+//
+//	domain  = "projectname.com"
+//	name    = "${element(var.projectname_hostnames_unproxied, count.index)}"
+//	type    = "A"
+//	value   = "${digitalocean_droplet.this.ipv4_address}"
+//	proxied = false
+//}
+//
+//resource "cloudflare_record" "projectname_dns_proxied" {
+//	count   = "${length(var.projectname_hostnames_proxied)}"
+//
+//	domain  = "projectname.com"
+//	name    = "${element(var.projectname_hostnames_proxied, count.index)}"
+//	type    = "A"
+//	value   = "${digitalocean_droplet.this.ipv4_address}"
+//	proxied = true
+//}
 
 variable "name" {
 	description = "The server name (should start with 'projectname_')"

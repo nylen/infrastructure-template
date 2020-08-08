@@ -20,7 +20,7 @@ provider "template" {
 // https://cloud.digitalocean.com/droplets
 
 module "projectname_www" {
-	source = "./modules/digitalocean-devuan/"
+	source = "./modules/digitalocean-devuan-beowulf/"
 	name   = "projectname.www"
 	projectname_users = [
 		"wwwfiles",
@@ -29,7 +29,6 @@ module "projectname_www" {
 		"composer",
 		"mariadb-client",
 		"webserver",
-		"webserver-php72",
 		"wp-cli",
 	]
 	projectname_hostnames_proxied = [

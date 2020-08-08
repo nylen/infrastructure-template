@@ -49,7 +49,9 @@ echo done > /projectname/server-setup/02-root-ssh-keys
 ###
 
 apt-get update
-apt-get upgrade -y
+# https://serverfault.com/a/839563
+# for cloud-init config file
+apt-get --yes --force-yes -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade
 
 echo done > /projectname/server-setup/03-apt-get-upgrade
 
@@ -79,7 +81,24 @@ echo done > /projectname/server-setup/05-ufw
 # Devuan migration: set up and reboot
 ###
 
-apt-get install -y sysvinit-core
+sources_list=$(cat <<APT
+deb http://deb.devuan.org/merged beowulf main
+deb http://deb.devuan.org/merged beowulf-updates main
+deb http://deb.devuan.org/merged beowulf-security main
+deb http://deb.devuan.org/merged beowulf-backports main
+APT
+)
+echo "$sources_list" > /etc/apt/sources.list
+echo "$sources_list" > /etc/cloud/templates/sources.list.debian.tmpl
+
+apt-get update --allow-insecure-repositories
+apt-get install -y devuan-keyring --allow-unauthenticated
+apt-get update
+
+apt-get upgrade -y
+apt-get install -y eudev || true # ignore errors
+apt-get -f install
+
 after_reboot=$(cat <<'EOF'
 #!/usr/bin/env bash
 
@@ -91,23 +110,9 @@ set -x
 # Devuan migration: after reboot
 ###
 
-apt-get purge -y systemd
-
-sources_list=$(cat <<APT
-deb http://deb.devuan.org/merged ascii main
-deb http://deb.devuan.org/merged ascii-updates main
-deb http://deb.devuan.org/merged ascii-security main
-deb http://deb.devuan.org/merged ascii-backports main
-APT
-)
-echo "$sources_list" > /etc/apt/sources.list
-
-apt-get update
-apt-get install -y devuan-keyring --allow-unauthenticated
-apt-get update
 apt-get dist-upgrade -y
+apt-get purge -y systemd libnss-systemd
 
-apt-get purge -y systemd-shim
 apt-get autoremove -y --purge
 apt-get autoclean
 
@@ -130,7 +135,7 @@ echo done > /projectname/server-setup/08-enable-ssh
 # All done!
 ###
 
-echo v2019-10-09 > /projectname/server-setup/99-done
+echo v2020-08-08 > /projectname/server-setup/99-done
 
 
 EOF
